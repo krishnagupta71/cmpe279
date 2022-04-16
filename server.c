@@ -2,13 +2,57 @@
 
 #include <unistd.h>
 #include <stdio.h>
-// only for linux #include <sys/socket.h>
-#include <Winsock2.h> // this is used for windows
+#include <sys/socket.h>
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <pwd.h>
 
 #define PORT 8080
+
+
+void drop_privileges(){
+    printf("Original UID is %d \n", getuid());
+    int childp_status;
+    struct passwd *pw;
+    pid_t c_pid = fork();
+
+    //fork call return negative value if a error has occured
+    if(c_pid<0){
+        perror("child failed");
+        exit(EXIT_FAILURE);
+    }
+
+    //fork call return positive value if it's the parent process
+    else if (c_pid > 0)
+    {
+        wait();
+        printf("In parent process after fork\n");
+        exit(1);
+    }
+
+    //fork call return zero value if it's the child process
+    else{
+        pw = getpwnam("nobody"); // getting nobody user
+
+        if( pw == NULL ){
+            printf("Unable to get user nobody.\n");
+            exit(1);
+        }
+
+        printf("Nobody UID %ld \n", (long)pw->pw_uid);
+        
+
+        long cp_uid = setuid(pw->pw_uid);
+
+        if(setuid(pw->pw_uid) == -1)
+        {
+            perror("setuid failed");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
 int main(int argc, char const *argv[])
 {
     int server_fd, new_socket, valread;
@@ -17,9 +61,6 @@ int main(int argc, char const *argv[])
     int addrlen = sizeof(address);
     char buffer[1024] = {0};
     char *hello = "Hello from server";
-
-    // Show ASLR
-    printf("execve=0x%p\n", execve);
 
     // Creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -51,6 +92,10 @@ int main(int argc, char const *argv[])
         perror("listen");
         exit(EXIT_FAILURE);
     }
+
+    // This is the correct point where we should drop privileges as admin privileges are only required to bind to port
+    drop_privileges();
+
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
                              (socklen_t *)&addrlen)) < 0)
     {
