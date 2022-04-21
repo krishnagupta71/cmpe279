@@ -2,7 +2,7 @@
 
 ### Submitted By: Krishna Gupta - 015721199
 
-## How to run assignment 1:
+## How to run assignments:
 
 For Linux based system. 
 
